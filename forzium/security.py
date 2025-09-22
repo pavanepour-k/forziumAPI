@@ -500,6 +500,33 @@ def refresh_and_rotate(
 API_KEYS = {"secret"}
 
 
+def _normalize_api_key(raw_value: Any) -> str | None:
+    """Return the first non-empty API key candidate from *raw_value*.
+
+    ``raw_value`` may be a string, a sequence of potential values, or ``None``.
+    The function iterates the sequence (if provided) and returns the first
+    truthy element coerced to ``str``. Empty strings and ``None`` entries are
+    skipped. If no suitable value is found ``None`` is returned.
+    """
+
+    if raw_value is None:
+        return None
+
+    if isinstance(raw_value, (list, tuple)):
+        for candidate in raw_value:
+            if not candidate:
+                continue
+            if isinstance(candidate, str):
+                return candidate
+            return str(candidate)
+        return None
+
+    if isinstance(raw_value, str):
+        return raw_value or None
+
+    return str(raw_value) if raw_value else None
+
+
 def api_key_query(request: Request) -> str:
     """Validate ``api_key`` query parameter and return its value.
 
@@ -507,10 +534,11 @@ def api_key_query(request: Request) -> str:
     invalid.
     """
 
-    key = request.query_params.get("api_key")
-    if key not in API_KEYS:
+    key = _normalize_api_key(request.query_params.get("api_key"))
+    if not key or key not in API_KEYS:
         raise HTTPException(401, "Invalid API key")
-    return str(key)
+    return key
+
 
 
 def revoke_token(token: str) -> None:
